@@ -1,0 +1,1 @@
+//Manages chat messages in real-time.

@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:yapper/Pages/auth_swipe_pages.dart';
+import 'package:yapper/Pages/chat_page.dart';
 import 'package:yapper/Pages/guide_page.dart';
 import 'package:yapper/Pages/home_page.dart';
 import 'package:yapper/Pages/login_page.dart';
-import 'package:yapper/Pages/nickname_page.dart';
-import 'package:yapper/Pages/password_page.dart';
 import 'package:yapper/Pages/search_page.dart';
-import 'package:yapper/Pages/username_page.dart';
 import 'package:yapper/Pages/welcome_page.dart';
 import 'package:yapper/Util/app_routes.dart';
 
@@ -20,15 +19,15 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      initialRoute: AppRoutes.welcomePage, // the first landing page
       routes: {
-        AppRoutes.homePage:(context)=>const HomePage(),
         AppRoutes.welcomePage:(context)=>const WelcomePage(),
+        AppRoutes.homePage:(context)=>const HomePage(),
         AppRoutes.guidePage:(context)=>const GuidePage(),
-        AppRoutes.nicknamePage:(context)=>const NickNamePage(),
-        AppRoutes.usernamePage:(context)=>const UserNamePage(),
-        AppRoutes.passwordPage:(context)=>const PasswordPage(),
         AppRoutes.loginPage:(context)=>const LoginPage(),
         AppRoutes.searchPage:(context)=>const SearchPage(),
+        AppRoutes.authSwipePages:(context) =>const AuthSwipePages(),
+        AppRoutes.chatPage:(context) =>const ChatPage(chatRoomId: '1',),//findout how you get chatroomid
       },
     );
   }
