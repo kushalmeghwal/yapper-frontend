@@ -42,23 +42,20 @@ class _AuthSwipePagesState extends State<AuthSwipePages> {
       );
       return;
     }
-   final response = await ApiService.signUp(_nickname, _username, _password);
+    final response = await ApiService.signUp(_nickname, _username, _password);
     if (response['success']) {
       if (!mounted) return;
-    Navigator.pushReplacementNamed(context, AppRoutes.loginPage);
-      } else {
-           if (!mounted) return;
+      Navigator.pushReplacementNamed(context, AppRoutes.loginPage);
+    } else {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(response['message'])),
-        );
+        SnackBar(content: Text(response['message'])),
+      );
     }
 
     if (kDebugMode) {
       print("Registering user: $_nickname, $_username");
     }
-   // Navigate to login page after successful registration
-    if (!mounted) return;
-    Navigator.pushReplacementNamed(context, AppRoutes.loginPage);
   }
 
   void _goToPreviousPage() {
@@ -107,7 +104,7 @@ class _AuthSwipePagesState extends State<AuthSwipePages> {
   }
 
   Widget _buildPasswordPage() {
-      return _buildPage(
+    return _buildPage(
       title: "Create a Password",
       hintText: "Password",
       onNext: _registerUser,
@@ -117,7 +114,7 @@ class _AuthSwipePagesState extends State<AuthSwipePages> {
     );
   }
 
- Widget _buildPage({
+  Widget _buildPage({
     required String title,
     required String hintText,
     bool isPassword = false,

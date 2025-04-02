@@ -8,4 +8,5 @@ class AppRoutes {
   static const String loginPage = '/login';//navigate to login page only after all three dot ••• pages are completed
   static const String searchPage = '/search';//already some recommendetions will the there,: how?
   static const String chatPage='/chat';//when a match found chatbox will be opened
+  static const String profilePage='/profile';
 }

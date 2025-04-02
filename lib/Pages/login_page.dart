@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:yapper/Services/token_manager.dart';
 import 'package:yapper/Util/app_routes.dart';
-
+import 'package:yapper/Services/api_services.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -12,10 +14,36 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _isPasswordVisible = false;
+  final storage = const FlutterSecureStorage();
 
-  void _login() {
-    // Here you can add authentication logic before navigating
-    Navigator.pushReplacementNamed(context, AppRoutes.searchPage);
+
+  void _login() async {
+    if (_usernameController.text.isEmpty || _passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please enter both username and password."),
+        ),
+      );
+      return;
+    }
+
+final response = await ApiService.login(_usernameController.text, _passwordController.text);
+
+    if (response['success']) {
+      if (!mounted) return;
+     // Store the token securely using TokenManager
+    await TokenManager.saveToken(response['token']);
+
+      // Navigate to the search page after successful login
+      Navigator.pushReplacementNamed(context, AppRoutes.searchPage);
+    } else {
+      if (!mounted) return;
+
+      // Show error message if login fails
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(response['message'])),
+      );
+    }
   }
 
   @override
@@ -56,7 +84,9 @@ class _LoginPageState extends State<LoginPage> {
                   prefixIcon: const Icon(Icons.lock),
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                      _isPasswordVisible
+                          ? Icons.visibility
+                          : Icons.visibility_off,
                     ),
                     onPressed: () {
                       setState(() {

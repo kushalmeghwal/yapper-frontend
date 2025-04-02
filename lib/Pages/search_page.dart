@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:jwt_decoder/jwt_decoder.dart';
+import 'package:yapper/Services/socket_services.dart';
 import 'package:yapper/Util/app_routes.dart';
-// import 'package:socket_io_client/socket_io_client.dart' as io;
+import 'package:yapper/Services/token_manager.dart';
+import 'dart:io';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
@@ -10,10 +14,11 @@ class SearchPage extends StatefulWidget {
 }
 
 class _SearchPageState extends State<SearchPage> {
-  String _selectedChoice = "Rizler";
+  String _selectedChoice = "Rizzler";
   bool _isSearching = false;
   String? _selectedMood;
-
+  String? _profileImagePath;
+  String? _userId;
   final List<String> _moods = [
     "Happy",
     "Sad",
@@ -23,26 +28,52 @@ class _SearchPageState extends State<SearchPage> {
     "Angry",
     "Nervous"
   ];
+  final SocketService _socketService = SocketService();
+  @override
+  void initState() {
+    super.initState();
+    _initializeUser();
+  }
 
-  // io.Socket? _socket;
+  void _initializeUser() async {
+    String? token = await TokenManager.getToken();
+    print('token-');
+    print(token);
+    if (token == null) return; // Exit if no token is found
 
-  // @override
-  // void initState() {
-  //   super.initState();
-  //   _socket = io.io("https://your-backend-url.com", <String, dynamic>{
-  //     "transports": ["websocket"],
-  //     "autoConnect": false,
-  //   });
-  //   _socket!.connect();
-  //   _socket!.on("match_found", (data) {
-  //     Navigator.push(
-  //       context,
-  //       MaterialPageRoute(
-  //         builder: (context) => ChatPage(chatRoomId: data["roomId"]),
-  //       ),
-  //     );
-  //   });
-  // }
+    Map<String, dynamic> decodedToken = JwtDecoder.decode(token);
+    String? userId = decodedToken["userId"];
+    print(userId);
+    if (userId != null) {
+      setState(() {
+        _userId = userId;
+      });
+ 
+      _socketService.connect(userId, _onMatchFound);
+    }
+  }
+
+  void _onMatchFound(String chatRoomId, String receiverId ,String receiverNickname) {
+    if (_userId == null) {
+      print(" Cannot navigate, _userId is null!");
+      return;
+    }
+    if (!mounted) return;
+    if (_userId == null) {
+      print("❌ _userId is null before using it!");
+    } else {
+      Navigator.pushNamed(
+        context,
+        AppRoutes.chatPage,
+        arguments: {
+          "chatRoomId": chatRoomId,
+          "userId": _userId!,
+          "receiverId": receiverId,
+          "receiverNickname":receiverNickname,
+        },
+      );
+    }
+  }
 
   void _chooseMood(String? mood) {
     setState(() {
@@ -51,9 +82,17 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   void _startSearching() {
+    print('search click hua');
     if (_selectedMood == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please select a mood before searching.")),
+      );
+      return;
+    }
+    if (_userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text("User ID is not available. Please log in again.")),
       );
       return;
     }
@@ -61,18 +100,27 @@ class _SearchPageState extends State<SearchPage> {
     setState(() {
       _isSearching = true;
     });
+    print('call se pahle');
 
-    // _socket!.emit("start_search", {"choice": _selectedChoice, "mood": _selectedMood});
+    print(
+        "Sending search request for userId: $_userId, Mood: $_selectedMood, Choice: $_selectedChoice");
+    _socketService.startSearching(_userId!, _selectedChoice, _selectedMood!);
+  }
 
-    Future.delayed(const Duration(seconds: 2), () {
-      if (!mounted) return; // ✅ Prevents calling Navigator if widget is disposed
+  Future<void> _pickImage() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
       setState(() {
-        _isSearching = false;
+        _profileImagePath = image.path;
       });
+    }
+  }
 
-      // Simulating a match found scenario
-      Navigator.pushNamed(context, AppRoutes.chatPage);
-    });
+  @override
+  void dispose() {
+    _socketService.disconnect();
+    super.dispose();
   }
 
   @override
@@ -90,11 +138,24 @@ class _SearchPageState extends State<SearchPage> {
             letterSpacing: 2.0,
           ),
         ),
+        leading: GestureDetector(
+          onTap: () => Navigator.pushNamed(context, AppRoutes.profilePage),
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: CircleAvatar(
+              backgroundImage: _profileImagePath != null
+                  ? FileImage(File(_profileImagePath!))
+                  : null,
+              child: _profileImagePath == null
+                  ? const Icon(Icons.person, color: Colors.white)
+                  : null,
+            ),
+          ),
+        ),
       ),
       body: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Mood Selection using Radio Buttons
           const Text("Choose Your Mood", style: TextStyle(fontSize: 18)),
           Column(
             children: _moods.map((mood) {
@@ -107,26 +168,24 @@ class _SearchPageState extends State<SearchPage> {
             }).toList(),
           ),
           const SizedBox(height: 20),
-          const Text("Choose with whom you wanna yap", style: TextStyle(fontSize: 18)),
-          // Choice Toggle Buttons
+          const Text("Choose with whom you wanna yap",
+              style: TextStyle(fontSize: 18)),
           ToggleButtons(
             isSelected: [
-              _selectedChoice == "Rizler",
-              _selectedChoice == "Gyaat"
+              _selectedChoice == "Rizzler",
+              _selectedChoice == "Gyatt"
             ],
             onPressed: (int index) {
               setState(() {
-                _selectedChoice = index == 0 ? "Rizler" : "Gyaat";
+                _selectedChoice = index == 0 ? "Rizzler" : "Gyatt";
               });
             },
             children: const [
-              Padding(padding: EdgeInsets.all(10), child: Text("Rizler")),
-              Padding(padding: EdgeInsets.all(10), child: Text("Gyaat"))
+              Padding(padding: EdgeInsets.all(10), child: Text("Rizzler")),
+              Padding(padding: EdgeInsets.all(10), child: Text("Gyatt"))
             ],
           ),
           const SizedBox(height: 20),
-
-          // Search Button
           ElevatedButton(
             onPressed: _isSearching ? null : _startSearching,
             child: Text(_isSearching ? "Searching..." : "Search"),
@@ -136,5 +195,3 @@ class _SearchPageState extends State<SearchPage> {
     );
   }
 }
-
-
