@@ -45,12 +45,8 @@ class SocketService  with ChangeNotifier {
           "✅ Match found! Chat Room: $chatRoomId with $receiverId ($receiverNickname)");
 
       // ✅ Ensure onMatchFound is not null before calling
-      if (onMatchFound != null) {
-        onMatchFound(chatRoomId, receiverId, receiverNickname);
-      } else {
-        print("❌ onMatchFound callback is null!");
-      }
-    });
+      onMatchFound(chatRoomId, receiverId, receiverNickname);
+        });
 
     socket.on("receive_message", (data) {
       print(

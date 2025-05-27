@@ -87,14 +87,14 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Chat with "), //${widget.receiverNickname}
+        title: const Text("Chat with "), //${widget.receiverNickname}
         leading: IconButton(
-          icon: Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.exit_to_app, color: Colors.red),
+            icon: const Icon(Icons.exit_to_app, color: Colors.red),
             onPressed: disconnectChat,
           )
         ],
@@ -114,17 +114,17 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Row(
               children: [
                 IconButton(
-                  icon: Icon(Icons.add),
+                  icon: const Icon(Icons.add),
                   onPressed: sendImage,
                 ),
                 Expanded(
                   child: TextField(
                     controller: _messageController,
-                    decoration: InputDecoration(hintText: "Enter message"),
+                    decoration: const InputDecoration(hintText: "Enter message"),
                   ),
                 ),
                 IconButton(
-                  icon: Icon(Icons.send),
+                  icon: const Icon(Icons.send),
                   onPressed: sendMessage,
                 )
               ],
