@@ -52,3 +52,8 @@ app.*.map.json
 .packages
 .pub-cache/
 build/
+
+.flutter-plugins-dependencies
+.flutter-plugins
+.metadata
+.fvmrc
