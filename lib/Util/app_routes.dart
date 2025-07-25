@@ -11,4 +11,5 @@ class AppRoutes {
   static const String profilePage='/profile';
   static const String googleLoginPage = '/google-login';
   static const String phoneLoginPage = '/phone-login';
+  static const String allChatPage = '/all-chats';
 }

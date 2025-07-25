@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
+import 'package:yapper/Pages/chat_page.dart';
 import 'package:yapper/Services/socket_services.dart';
 import 'package:yapper/Util/app_routes.dart';
 import 'package:yapper/Services/token_manager.dart';
@@ -8,7 +9,7 @@ import 'dart:io';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
-
+  
   @override
   State<SearchPage> createState() => _SearchPageState();
 }
@@ -30,6 +31,7 @@ class _SearchPageState extends State<SearchPage> {
     "Nervous"
   ];
   final SocketService _socketService = SocketService();
+
   @override
   void initState() {
     super.initState();
@@ -70,16 +72,22 @@ class _SearchPageState extends State<SearchPage> {
       return;
     }
 
-    Navigator.pushNamed(
-      context,
-      AppRoutes.chatPage,
-      arguments: {
-        "chatRoomId": chatRoomId,
-        "userId": _userId!,
-        "receiverId": receiverId,
-        "receiverNickname": receiverNickname,
-      },
-    );
+    Navigator.push(
+    context,
+    MaterialPageRoute(
+    builder: (_) => ChatPage(
+      chatRoomId: chatRoomId,
+      userId: _userId!,
+      receiverId: receiverId,
+      receiverNickname: receiverNickname,
+    ),
+  ),
+).then((_) {
+  setState(() {
+    _isSearching = false;
+  });
+});
+
   }
 
   void _chooseMood(String? mood) {
@@ -87,7 +95,15 @@ class _SearchPageState extends State<SearchPage> {
       _selectedMood = mood;
     });
   }
-
+    void _goToAllChatPage() {
+  if (_userId != null) {
+    Navigator.pushNamed(context, AppRoutes.allChatPage, arguments: _userId);
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("User ID is not available.")),
+    );
+  }
+}
   void _startSearching() {
     print('search click hua');
     if (_selectedMood == null) {
@@ -148,6 +164,13 @@ class _SearchPageState extends State<SearchPage> {
             letterSpacing: 2.0,
           ),
         ),
+         actions: [
+            IconButton(
+            icon: const Icon(Icons.list_alt),
+            onPressed: _goToAllChatPage,
+            tooltip: 'All Chats',
+          ),
+         ],
         leading: GestureDetector(
           onTap: () => Navigator.pushNamed(context, AppRoutes.profilePage),
           child: Padding(

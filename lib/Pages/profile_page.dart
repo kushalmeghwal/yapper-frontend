@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:yapper/Services/api_services.dart';
+import 'package:yapper/Services/recent_chats_manager.dart';
+import 'package:yapper/Services/socket_services.dart';
 import 'package:yapper/Services/token_manager.dart';
 import 'package:yapper/Util/app_routes.dart';
 class ProfilePage extends StatefulWidget {
@@ -105,7 +107,10 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _logout() async {
-    await TokenManager.deleteToken();
+    await SocketService().cleanUpSocket(); // properly cleans listeners and disconnects
+    await TokenManager.deleteToken(); // clears secure storage tokens
+    RecentChatsManager().clear();  // clear local chat cache
+    SocketService().disconnect(); 
     if (!mounted) return;
     Navigator.pushReplacementNamed(context, AppRoutes.loginPage);
   }
