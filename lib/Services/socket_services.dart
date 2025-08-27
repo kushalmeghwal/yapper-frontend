@@ -3,6 +3,7 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'dart:async';
 
 class SocketService with ChangeNotifier {
+  static const String baseUrl = 'https://yapper-backend-vnvq.onrender.com';
   static final SocketService _instance = SocketService._internal();
   factory SocketService() => _instance;
   SocketService._internal();
@@ -12,178 +13,110 @@ class SocketService with ChangeNotifier {
   Function(Map<String, dynamic>)? onMessageReceived;
   Function(List<dynamic>)? onChatHistoryReceived;
   Function(List<Map<String, dynamic>>)? onAllChatsReceived;
-  
+
   bool _isConnected = false;
   String? _userId;
   bool _isInitializing = false;
   Timer? _heartbeatTimer;
-  Set<String> _processedMessageIds = {};
+  final Set<String> _processedMessageIds = {};
 
-  void connect(
-      String userId, Function(String, String, String) onMatchFoundCallback) {
-    print("void connect chala");
+  void connect(String userId, Function(String, String, String) onMatchFoundCallback) {
+    if (_userId != null && _isConnected) return; // Already connected
     _userId = userId;
     onMatchFound = onMatchFoundCallback;
     _initializeSocket();
   }
 
-  void _initializeSocket() async {
-    if (_isInitializing) {
-      print('Socket initialization already in progress...');
-      return;
-    }
-
+  void _initializeSocket() {
+    if (_isInitializing) return;
     _isInitializing = true;
-    print("initialise hua");
 
-     if (_isConnected) {
-    socket.off('matchFound'); 
-  }
+    socket = io.io(baseUrl,
+      io.OptionBuilder()
+          .setTransports(['websocket'])
+          .enableReconnection()
+          .setReconnectionAttempts(1000)
+          .setReconnectionDelay(1000)
+          .setTimeout(60000)
+          .disableAutoConnect()
+          .build(),
+    );
 
-    try {
-      socket = io.io(
-        'http://10.0.2.2:3000',
-        // 'https://yapper-backend-production.up.railway.app',
-        // 'https: //230nlqqq-3000.inc1.devtunnels.ms',
-        io.OptionBuilder()
-            .setTransports(['websocket'])
-            .enableReconnection()
-            .setReconnectionAttempts(1000)
-            .setReconnectionDelay(1000)
-            .setTimeout(60000)
-            .disableAutoConnect()
-            .build(),
-      );
+    // Connect
+    socket.connect();
 
-      print("initialise hone ke bad");
-      socket.connect();
+    // Connect listener
+    socket.onConnect((_) {
+      _isConnected = true;
+      _isInitializing = false;
+      notifyListeners();
+      if (_userId != null) socket.emit('userOnline', _userId);
+      if (_userId != null) socket.emit('join', _userId);
+      _startHeartbeat();
+    });
 
-      print("connect ke bad");
-      socket.onConnect((_) {
-        print('Connected to server');
-        _isConnected = true;
-        _isInitializing = false;
-        notifyListeners();
-    socket.emit('userOnline', _userId);
-        // Start heartbeat
-        _startHeartbeat();
-
-        if (_userId != null) {
-          socket.emit('join', _userId);
-          print('Emitted join for $_userId');
-        }
-      });
-
-      socket.onDisconnect((_) {
-        print('Disconnected from server - Attempting to reconnect...');
-        _isConnected = false;
-        _isInitializing = false;
-        _stopHeartbeat();
-        notifyListeners();
-        // Automatically try to reconnect
-        _initializeSocket();
-      });
-
-      socket.onConnectError((error) {
-        print('Connection error: $error - Attempting to reconnect...');
-        _isConnected = false;
-        _isInitializing = false;
-        _stopHeartbeat();
-        notifyListeners();
-        // Automatically try to reconnect
-        _initializeSocket();
-      });
-
-      socket.onError((error) {
-        print('Socket error: $error - Attempting to reconnect...');
-        _isConnected = false;
-        _isInitializing = false;
-        _stopHeartbeat();
-        notifyListeners();
-        // Automatically try to reconnect
-        _initializeSocket();
-      });
-
-      socket.on('matchFound', (data) {
-        print("Match found event received: $data");
-        if (onMatchFound != null) {
-          onMatchFound!(
-              data['chatRoomId'], data['receiverId'], data['receiverNickname']);
-        }
-         _isConnected = true;
-      });
-      socket.on('allChats', (data) {
-        if (onAllChatsReceived != null && data is List) {
-          onAllChatsReceived!(List<Map<String, dynamic>>.from(data));
-        }
-      });
-      socket.on('receiveMessage', (data) {
-        print("Message received event: $data");
-        // Generate a unique message ID
-        final messageId =
-            '${data['chatRoomId']}_${data['senderId']}_${data['timestamp']}';
-
-        // Check if we've already processed this message
-        if (_processedMessageIds.contains(messageId)) {
-          print('Duplicate message received, ignoring: $messageId');
-          return;
-        }
-
-        // Add to processed messages
-        _processedMessageIds.add(messageId);
-
-        // Keep only last 1000 message IDs
-        if (_processedMessageIds.length > 1000) {
-          _processedMessageIds = _processedMessageIds
-              .skip(_processedMessageIds.length - 1000)
-              .toSet();
-        }
-
-        if (onMessageReceived != null) {
-          onMessageReceived!(data);
-        }
-      });
-
-      socket.on('chatHistory', (data) {
-        print("Chat history received: $data");
-        if (onChatHistoryReceived != null) {
-          onChatHistoryReceived!(data);
-        }
-      });
-
-      socket.on('messageError', (data) {
-        print("Message error received: $data");
-      });
-
-      socket.on('pong', (_) {
-        print('Received pong from server');
-      });
-    } catch (error) {
-      print('Error initializing socket: $error');
+    // Disconnect listener
+    socket.onDisconnect((_) {
       _isConnected = false;
       _isInitializing = false;
       _stopHeartbeat();
       notifyListeners();
-    }
+      Future.delayed(const Duration(seconds: 2), _initializeSocket); // Try reconnect
+    });
+
+    // Error handling
+    socket.onConnectError((error) => _handleError(error));
+    socket.onError((error) => _handleError(error));
+
+    // Heartbeat response
+    socket.on('pong', (_) => print('Received pong from server'));
+
+    // Match found
+    socket.on('matchFound', (data) {
+      if (onMatchFound != null) {
+        onMatchFound!(data['chatRoomId'], data['receiverId'], data['receiverNickname']);
+      }
+    });
+
+    // All chats
+    socket.on('allChats', (data) {
+      if (onAllChatsReceived != null && data is List) {
+        onAllChatsReceived!(List<Map<String, dynamic>>.from(data));
+      }
+    });
+
+    // Chat history
+    socket.on('chatHistory', (data) {
+      if (onChatHistoryReceived != null) {
+        onChatHistoryReceived!(data);
+      }
+    });
+
+    // Incoming messages
+    socket.on('receiveMessage', (data) {
+      final messageId = '${data['chatRoomId']}_${data['senderId']}_${data['timestamp']}';
+      if (_processedMessageIds.contains(messageId)) return;
+      _processedMessageIds.add(messageId);
+      if (_processedMessageIds.length > 1000) {
+        _processedMessageIds.remove(_processedMessageIds.first);
+      }
+      if (onMessageReceived != null) onMessageReceived!(data);
+    });
   }
-Future<void> cleanUpSocket() async {
-socket?.off('matchFound');
-  socket?.off('allChats');
-  socket?.off('message');
-  socket?.off('chatHistory');
-  socket?.off('connect');
-  socket?.off('disconnect');
-  socket?.disconnect();
-  _userId = null;
-}
+
+  void _handleError(dynamic error) {
+    print('Socket error: $error - Attempting to reconnect...');
+    _isConnected = false;
+    _isInitializing = false;
+    _stopHeartbeat();
+    notifyListeners();
+    Future.delayed(const Duration(seconds: 2), _initializeSocket);
+  }
 
   void _startHeartbeat() {
-    _stopHeartbeat(); // Clear any existing heartbeat
-    _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
-      if (_isConnected) {
-        print('Sending heartbeat ping');
-        socket.emit('ping');
-      }
+    _stopHeartbeat();
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (_isConnected) socket.emit('ping');
     });
   }
 
@@ -191,156 +124,96 @@ socket?.off('matchFound');
     _heartbeatTimer?.cancel();
     _heartbeatTimer = null;
   }
-  void removeMatchFoundListener() {
-  socket.off('matchFound');
-    onMatchFound = null;
-   }
 
-  // Start searching for a match
   void startSearching(String userId, String type, String mood) {
-    print("Starting search - UserId: $userId, Type: $type, Mood: $mood");
     if (!_isConnected) {
-      print('🔌 Not connected. Cannot start searching.');
+      socket.onConnect((_) => _emitSearch(userId, type, mood));
       _initializeSocket();
-      // Wait for connection before starting search
-      socket.onConnect((_) {
-        print('Reconnected, now starting search...');
-        _startSearchingInternal(userId, type, mood);
-      });
       return;
     }
-    _startSearchingInternal(userId, type, mood);
+    _emitSearch(userId, type, mood);
   }
 
-  void leaveChatRoom(String chatRoomId) {
-    if (socket.connected) {
-      print('Leaving chat room: $chatRoomId');
-      socket.emit('leave_chat', chatRoomId);
-    } else {
-      print('Socket not connected. Cannot leave room.');
-    }
+  void _emitSearch(String userId, String type, String mood) {
+    socket.emit('startSearching', {'userId': userId, 'type': type, 'mood': mood});
   }
 
-  void _startSearchingInternal(String userId, String type, String mood) {
-    print('Emitting startSearching event');
-    socket
-        .emit('startSearching', {'userId': userId, 'type': type, 'mood': mood});
-    print("Search request emitted");
-  }
-
-  //all chats
-  void requestAllChats(String userId) {
-    print("Requesting all chats for user: $userId");
-    if (!_isConnected) {
-      print('🔌 Not connected. Cannot request all chats.');
-      _initializeSocket();
-      socket.onConnect((_) {
-        socket.emit('getAllChats', {'userId': userId});
-      });
-      return;
-    }
-    socket.emit('getAllChats', {'userId': userId});
-  }
-
-  // Stop searching for a match
   void stopSearching(String userId) {
-    print("Stopping search for user: $userId");
-    if (!_isConnected) {
-      print('🔌 Not connected. Cannot stop searching.');
-      return;
-    }
-    socket.emit('stopSearching', userId);
-    print("Stop search request emitted");
+    if (_isConnected) socket.emit('stopSearching', userId);
   }
 
-  void joinChatRoom(String chatRoomId) {
-    if (socket.connected) {
-      print('Joining chat room: $chatRoomId');
-      socket.emit('join_chat', chatRoomId);
-    } else {
-      print('Socket not connected. Cannot join room.');
-    }
-  }
-
-  void sendMessage(
-      String chatRoomId, String senderId, String receiverId, String message) {
-    print("✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅1");
-    print(
-        "Sending message - chatRoomId: $chatRoomId, senderId: $senderId, receiverId: $receiverId, message: $message");
-    print(
-        "Current connection state - isConnected: $_isConnected, isInitializing: $_isInitializing");
-
-    // Ensure we're connected before sending
+  void sendMessage(String chatRoomId, String senderId, String receiverId, String message) {
     if (!_isConnected) {
-      print('Socket not connected. Attempting to reconnect...');
+      socket.onConnect((_) => _sendMessageInternal(chatRoomId, senderId, receiverId, message));
       _initializeSocket();
-      // Wait for connection before sending
-      socket.onConnect((_) {
-        print('Reconnected, now sending message...');
-        print("✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅2");
-        _sendMessageInternal(chatRoomId, senderId, receiverId, message);
-      });
       return;
     }
-    print("✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅3");
     _sendMessageInternal(chatRoomId, senderId, receiverId, message);
   }
 
-  void _sendMessageInternal(
-      String chatRoomId, String senderId, String receiverId, String message) {
-    print("Sending message internally - chatRoomId: $chatRoomId");
+  void _sendMessageInternal(String chatRoomId, String senderId, String receiverId, String message) {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final messageData = {
+    final messageId = '${chatRoomId}_${senderId}_$timestamp';
+    _processedMessageIds.add(messageId);
+
+    socket.emit('sendMessage', {
       'chatRoomId': chatRoomId,
       'senderId': senderId,
       'receiverId': receiverId,
       'message': message,
       'timestamp': timestamp
-    };
-
-    // Add to processed messages immediately to prevent duplicates
-    final messageId = '${chatRoomId}_${senderId}_$timestamp';
-    _processedMessageIds.add(messageId);
-    print("✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅4");
-    socket.emit('sendMessage', messageData);
-    print("Message emit completed");
+    });
   }
 
   void getChatHistory(String chatRoomId) {
-    print("Getting chat history for room: $chatRoomId");
     if (!_isConnected) {
-      print('Socket not connected. Attempting to reconnect...');
+      socket.onConnect((_) => _getChatHistoryInternal(chatRoomId));
       _initializeSocket();
-      // Wait for connection before getting history
-      socket.onConnect((_) {
-        print('Reconnected, now getting chat history...');
-        _getChatHistoryInternal(chatRoomId);
-      });
       return;
     }
     _getChatHistoryInternal(chatRoomId);
   }
 
   void _getChatHistoryInternal(String chatRoomId) {
-    print("Getting chat history internally for room: $chatRoomId");
     socket.emit('getChatHistory', {'chatRoomId': chatRoomId});
-    print("Chat history request emitted");
   }
 
+  void joinChatRoom(String chatRoomId) {
+    if (_isConnected) socket.emit('joinRoom', chatRoomId);
+  }
 
-  // Only call this when user explicitly logs out
-  void disconnect() {
+  void leaveChatRoom(String chatRoomId) {
+    if (_isConnected) socket.emit('leaveRoom', chatRoomId);
+  }
+
+  void requestAllChats(String userId) {
+    if (!_isConnected) {
+      socket.onConnect((_) => socket.emit('getAllChats', {'userId': userId}));
+      _initializeSocket();
+      return;
+    }
+    socket.emit('getAllChats', {'userId': userId});
+  }
+
+  Future<void> cleanUpSocket() async {
+    socket.off('matchFound');
+    socket.off('allChats');
+    socket.off('receiveMessage');
+    socket.off('chatHistory');
+    socket.off('connect');
+    socket.off('disconnect');
     _stopHeartbeat();
-     socket.off('matchFound');
-       socket.off('message');
-  socket.off('allChats');
-    socket.disconnect();
+    _processedMessageIds.clear();
     _isConnected = false;
     _isInitializing = false;
-    _processedMessageIds.clear();
-    notifyListeners();
+    _userId = null;
+    socket.disconnect();
   }
 
+  void disconnect() {
+    cleanUpSocket();
+    notifyListeners();
+  }
 
   bool get isConnected => _isConnected;
 }

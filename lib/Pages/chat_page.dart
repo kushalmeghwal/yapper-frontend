@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:jwt_decoder/jwt_decoder.dart';
 import 'package:yapper/Pages/all_chats_page.dart';
 import 'package:yapper/Services/recent_chats_manager.dart';
 import 'package:yapper/Services/socket_services.dart';
 import 'package:yapper/Services/token_manager.dart';
-import 'package:jwt_decoder/jwt_decoder.dart';
-import 'package:yapper/Util/app_routes.dart';
 
 class ChatPage extends StatefulWidget {
   final String chatRoomId;
@@ -36,44 +35,37 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Future<void> _setupSocket() async {
-    print('Initializing chat...');
+    // Join chat room
     _socketService.joinChatRoom(widget.chatRoomId);
 
+    // Assign socket callbacks
     _socketService.onMessageReceived = _onMessageReceived;
     _socketService.onChatHistoryReceived = _onChatHistoryReceived;
 
-    final token = await TokenManager.getToken();
-    if (token == null) {
-      print('No token found');
-      return;
+    // Connect socket with userId from token if needed
+    String userId = widget.userId;
+    if (userId.isEmpty) {
+      final token = await TokenManager.getToken();
+      if (token != null && !JwtDecoder.isExpired(token)) {
+        final decoded = JwtDecoder.decode(token);
+        userId = decoded["userId"] ?? '';
+      }
     }
-
-    final decoded = JwtDecoder.decode(token);
-    final userId = decoded["userId"];
-    if (userId == null) {
-      print('No userId in token');
-      return;
-    }
+    if (userId.isEmpty) return;
 
     _socketService.connect(userId, _onMatchFound);
 
-    if (widget.chatRoomId.isEmpty || widget.chatRoomId == 'chat_NaN_NaN') {
-      print('Invalid chatRoomId');
-      return;
+    // Fetch chat history
+    if (widget.chatRoomId.isNotEmpty && widget.chatRoomId != 'chat_NaN_NaN') {
+      _socketService.getChatHistory(widget.chatRoomId);
     }
-
-    _socketService.getChatHistory(widget.chatRoomId);
   }
 
-  void _onMatchFound(
-      String chatRoomId, String receiverId, String receiverNickname) {
-    print('Match found: $chatRoomId, $receiverId, $receiverNickname');
-    // Can be used to navigate or update state if needed.
+  void _onMatchFound(String chatRoomId, String receiverId, String receiverNickname) {
+    // Currently no navigation needed, can update state if desired
   }
 
   void _onMessageReceived(Map<String, dynamic> data) {
-    print('Message received: $data');
-
     if (data['chatRoomId'] != widget.chatRoomId) return;
 
     final timestamp = data['timestamp'] is String
@@ -88,6 +80,7 @@ class _ChatPageState extends State<ChatPage> {
       });
     });
 
+    // Update recent chats
     RecentChatsManager().addOrUpdateChat(
       RecentChat(
         chatRoomId: widget.chatRoomId,
@@ -100,17 +93,16 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void _onChatHistoryReceived(List<dynamic> messages) {
-    print('Chat history received: $messages');
-
     setState(() {
-      _messages.clear();
-      _messages.addAll(messages.map((msg) => {
-            'senderId': msg['senderId'],
-            'message': msg['message'],
-            'timestamp': msg['timestamp'] is String
-                ? DateTime.parse(msg['timestamp'])
-                : DateTime.fromMillisecondsSinceEpoch(msg['timestamp']),
-          }));
+      _messages
+        ..clear()
+        ..addAll(messages.map((msg) => {
+              'senderId': msg['senderId'],
+              'message': msg['message'],
+              'timestamp': msg['timestamp'] is String
+                  ? DateTime.parse(msg['timestamp'])
+                  : DateTime.fromMillisecondsSinceEpoch(msg['timestamp']),
+            }));
     });
   }
 
@@ -118,14 +110,8 @@ class _ChatPageState extends State<ChatPage> {
     final text = _messageController.text.trim();
     if (text.isEmpty || widget.chatRoomId == 'chat_NaN_NaN') return;
 
-    _socketService.sendMessage(
-      widget.chatRoomId,
-      widget.userId,
-      widget.receiverId,
-      text,
-    );
-
     final now = DateTime.now();
+    _socketService.sendMessage(widget.chatRoomId, widget.userId, widget.receiverId, text);
 
     RecentChatsManager().addOrUpdateChat(
       RecentChat(
@@ -137,44 +123,28 @@ class _ChatPageState extends State<ChatPage> {
       ),
     );
 
+  
+
     _messageController.clear();
   }
 
-  void _disconnectAndReturn(String route) {
-    print('Disconnecting and returning to $route');
-    // _socketService.leaveChatRoom(widget.chatRoomId);
-    _socketService.disconnect();
+  void _returnToAllChats() {
     if (!mounted) return;
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(
-        builder: (_) => AllChatPage(userId: widget.userId),
-      ),
-    );
-  }
-
-  void _returnToAllChat(String route) {
-    print('returning to allchat page $route');
-    // _socketService.leaveChatRoom(widget.chatRoomId);
-    if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => AllChatPage(userId: widget.userId),
-      ),
+      MaterialPageRoute(builder: (_) => AllChatPage(userId: widget.userId)),
     );
   }
 
   @override
   void dispose() {
-    super.dispose();
     _socketService.leaveChatRoom(widget.chatRoomId);
     _messageController.dispose();
+    super.dispose();
   }
 
-  String _formatTimestamp(DateTime timestamp) {
-    return '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}';
-  }
+  String _formatTimestamp(DateTime timestamp) =>
+      '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}';
 
   Widget _buildMessageBubble(Map<String, dynamic> message) {
     final isMe = message['senderId'] == widget.userId;
@@ -190,17 +160,9 @@ class _ChatPageState extends State<ChatPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              message['message'],
-              style: TextStyle(color: isMe ? Colors.white : Colors.black),
-            ),
-            Text(
-              _formatTimestamp(message['timestamp']),
-              style: TextStyle(
-                fontSize: 12,
-                color: isMe ? Colors.white70 : Colors.black54,
-              ),
-            ),
+            Text(message['message'], style: TextStyle(color: isMe ? Colors.white : Colors.black)),
+            Text(_formatTimestamp(message['timestamp']),
+                style: TextStyle(fontSize: 12, color: isMe ? Colors.white70 : Colors.black54)),
           ],
         ),
       ),
@@ -209,11 +171,10 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-        _disconnectAndReturn(AppRoutes.allChatPage);
+    return WillPopScope(
+      onWillPop: () async {
+        _returnToAllChats();
+        return false;
       },
       child: Scaffold(
         appBar: AppBar(
@@ -222,13 +183,8 @@ class _ChatPageState extends State<ChatPage> {
           actions: [
             IconButton(
               icon: const Icon(Icons.list_alt),
-              onPressed: () => _returnToAllChat(AppRoutes.allChatPage),
+              onPressed: _returnToAllChats,
               tooltip: 'All Chats',
-            ),
-            IconButton(
-              icon: const Icon(Icons.call_end),
-              onPressed: () => _disconnectAndReturn(AppRoutes.searchPage),
-              tooltip: 'Disconnect',
             ),
           ],
         ),
@@ -239,7 +195,8 @@ class _ChatPageState extends State<ChatPage> {
                 reverse: true,
                 itemCount: _messages.length,
                 itemBuilder: (context, index) => _buildMessageBubble(
-                    _messages[_messages.length - 1 - index]),
+                  _messages[_messages.length - 1 - index],
+                ),
               ),
             ),
             _buildInputBar(),
@@ -265,8 +222,8 @@ class _ChatPageState extends State<ChatPage> {
           ),
           IconButton(
             icon: const Icon(Icons.send),
-            onPressed: _sendMessage,
             color: Colors.deepPurple,
+            onPressed: _sendMessage,
           ),
         ],
       ),

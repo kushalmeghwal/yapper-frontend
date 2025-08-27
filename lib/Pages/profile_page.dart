@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -59,7 +60,14 @@ class _ProfilePageState extends State<ProfilePage> {
       );
       return;
     }
-
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    final idToken = await firebaseUser!.getIdToken();
+    if (idToken == null) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(content: Text('Failed to get ID Token')),
+  );
+  return;
+}
     final token = await TokenManager.getToken();
     if (token == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -69,7 +77,7 @@ class _ProfilePageState extends State<ProfilePage> {
     }
 
     final response = await ApiService.updateFirebaseUserProfile(
-      token: token,
+      idToken: idToken,
       nickname: nickname,
       username: username,
     );

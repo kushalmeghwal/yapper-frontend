@@ -9,13 +9,13 @@ import 'dart:io';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
-  
+
   @override
   State<SearchPage> createState() => _SearchPageState();
 }
 
 class _SearchPageState extends State<SearchPage> {
-  String _selectedChoice = "Rizzler";
+  String _selectedChoice="Rizzler";
   bool _isSearching = false;
   String? _selectedMood;
   String? _profileImagePath;
@@ -25,8 +25,8 @@ class _SearchPageState extends State<SearchPage> {
     "Happy",
     "Sad",
     "Excited",
-    "Sexy",
-    "Horny",
+    "Lazy",
+    "Thirsty",
     "Angry",
     "Nervous"
   ];
@@ -45,7 +45,7 @@ class _SearchPageState extends State<SearchPage> {
     if (token == null) return; // Exit if no token is found
 
     Map<String, dynamic> decodedToken = JwtDecoder.decode(token);
-    String? userId = decodedToken["userId"];
+    String? userId = decodedToken["userId"] ?? decodedToken["user_id"] ?? decodedToken["sub"];
     print(userId);
     if (userId != null) {
       setState(() {
@@ -59,13 +59,13 @@ class _SearchPageState extends State<SearchPage> {
   void _onMatchFound(
       String chatRoomId, String receiverId, String receiverNickname) {
     print('Match found with chatRoomId: $chatRoomId');
-    
+
     if (_userId == null) {
       print("Cannot navigate, _userId is null!");
       return;
     }
     if (!mounted) return;
-    
+
     // Validate chat room ID
     if (chatRoomId.isEmpty || chatRoomId == 'chat_NaN_NaN') {
       print('Invalid chat room ID received: $chatRoomId');
@@ -73,21 +73,20 @@ class _SearchPageState extends State<SearchPage> {
     }
 
     Navigator.push(
-    context,
-    MaterialPageRoute(
-    builder: (_) => ChatPage(
-      chatRoomId: chatRoomId,
-      userId: _userId!,
-      receiverId: receiverId,
-      receiverNickname: receiverNickname,
-    ),
-  ),
-).then((_) {
-  setState(() {
-    _isSearching = false;
-  });
-});
-
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChatPage(
+          chatRoomId: chatRoomId,
+          userId: _userId!,
+          receiverId: receiverId,
+          receiverNickname: receiverNickname,
+        ),
+      ),
+    ).then((_) {
+      setState(() {
+        _isSearching = false;
+      });
+    });
   }
 
   void _chooseMood(String? mood) {
@@ -95,15 +94,17 @@ class _SearchPageState extends State<SearchPage> {
       _selectedMood = mood;
     });
   }
-    void _goToAllChatPage() {
-  if (_userId != null) {
-    Navigator.pushNamed(context, AppRoutes.allChatPage, arguments: _userId);
-  } else {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("User ID is not available.")),
-    );
+
+  void _goToAllChatPage() {
+    if (_userId != null) {
+      Navigator.pushNamed(context, AppRoutes.allChatPage, arguments: _userId);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("User ID is not available.")),
+      );
+    }
   }
-}
+
   void _startSearching() {
     print('search click hua');
     if (_selectedMood == null) {
@@ -123,12 +124,12 @@ class _SearchPageState extends State<SearchPage> {
     setState(() {
       _isSearching = true;
     });
-    
+
     print('Starting search with:');
     print('userId: $_userId');
     print('type: $_selectedChoice');
     print('mood: $_selectedMood');
-    
+
     _socketService.startSearching(_userId!, _selectedChoice, _selectedMood!);
     print("call ke bad");
   }
@@ -164,13 +165,13 @@ class _SearchPageState extends State<SearchPage> {
             letterSpacing: 2.0,
           ),
         ),
-         actions: [
-            IconButton(
+        actions: [
+          IconButton(
             icon: const Icon(Icons.list_alt),
             onPressed: _goToAllChatPage,
             tooltip: 'All Chats',
           ),
-         ],
+        ],
         leading: GestureDetector(
           onTap: () => Navigator.pushNamed(context, AppRoutes.profilePage),
           child: Padding(
@@ -186,46 +187,46 @@ class _SearchPageState extends State<SearchPage> {
           ),
         ),
       ),
-      body:  SingleChildScrollView(
-       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Text("Choose Your Mood", style: TextStyle(fontSize: 18)),
-          Column(
-            children: _moods.map((mood) {
-              return RadioListTile<String>(
-                title: Text(mood),
-                value: mood,
-                groupValue: _selectedMood,
-                onChanged: _chooseMood,
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 20),
-          const Text("Choose with whom you wanna yap",
-              style: TextStyle(fontSize: 18)),
-          ToggleButtons(
-            isSelected: [
-              _selectedChoice == "Rizzler",
-              _selectedChoice == "Gyatt"
-            ],
-            onPressed: (int index) {
-              setState(() {
-                _selectedChoice = index == 0 ? "Rizzler" : "Gyatt";
-              });
-            },
-            children: const [
-              Padding(padding: EdgeInsets.all(10), child: Text("Rizzler")),
-              Padding(padding: EdgeInsets.all(10), child: Text("Gyatt"))
-            ],
-          ),
-          const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: _isSearching ? null : _startSearching,
-            child: Text(_isSearching ? "Searching..." : "Search"),
-          ),
-        ],
-      ),
+      body: SingleChildScrollView(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text("Choose Your Mood", style: TextStyle(fontSize: 18)),
+            Column(
+              children: _moods.map((mood) {
+                return RadioListTile<String>(
+                  title: Text(mood),
+                  value: mood,
+                  groupValue: _selectedMood,
+                  onChanged: _chooseMood,
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 20),
+            const Text("Choose with whom you wanna yap",
+                style: TextStyle(fontSize: 18)),
+            ToggleButtons(
+              isSelected: [
+                _selectedChoice == "Rizzler",
+                _selectedChoice == "Shawty"
+              ],
+              onPressed: (int index) {
+                setState(() {
+                  _selectedChoice = index == 0 ? "Rizzler" : "Shawty";
+                });
+              },
+              children: const [
+                Padding(padding: EdgeInsets.all(10), child: Text("Rizzler")),
+                Padding(padding: EdgeInsets.all(10), child: Text("Shawty"))
+              ],
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _isSearching ? null : _startSearching,
+              child: Text(_isSearching ? "Searching..." : "Search"),
+            ),
+          ],
+        ),
       ),
     );
   }
