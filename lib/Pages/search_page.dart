@@ -132,6 +132,15 @@ class _SearchPageState extends State<SearchPage> {
 
     _socketService.startSearching(_userId!, _selectedChoice, _selectedMood!);
     print("call ke bad");
+
+      // ⏳ Timeout after 30 seconds if no match found
+  Future.delayed(const Duration(seconds: 30), () {
+    if (mounted && _isSearching) {
+      setState(() {
+        _isSearching = false;
+      });
+    }
+  });
   }
 
   Future<void> _pickImage() async {
