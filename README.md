@@ -1,16 +1,42 @@
-# yapper
+# 💬 Yapper – A Modern Chat Application
 
-A new Flutter project.
+Yapper is a **next-generation chatting application** built with **Flutter (Dart)**, designed to appeal to **younger audiences** through a clean UI, real-time messaging, and modern backend technologies.  
+The app focuses on **speed, simplicity, and secure communication**.
 
-## Getting Started
+---
 
-This project is a starting point for a Flutter application.
+## 🚀 Features
 
-A few resources to get you started if this is your first Flutter project:
+- ⚡ Real-time messaging using **WebSockets**
+- 🔐 Secure authentication with **JWT (JSON Web Tokens)**
+- 📱 Cross-platform support (Android, Web)
+- 🎨 Modern & minimal UI designed for young users
+- 🔄 Instant message delivery without refresh
+- 🧠 Scalable architecture for future features
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+---
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## 🛠 Tech Stack
+
+### Frontend
+- **Flutter**
+- **Dart**
+
+### Backend (Communication & Security)
+- **WebSocket** – real-time, bidirectional communication
+- **JWT Authentication** – secure user sessions
+
+---
+
+## 🧩 Architecture Overview
+
+- Flutter handles UI and user interactions
+- WebSocket manages real-time chat communication
+- JWT ensures secure login and protected messaging
+- Designed to be lightweight, fast, and scalable
+
+---
+
+## 📂 Project Structure (Simplified)
+
+
